@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-2xl font-bold mb-4">Listen Mode</h2>
+<form method="post" id="listen-form" class="max-w-md">
+  <input type="hidden" name="target" value="{{ target }}" />
+  <input type="hidden" name="reaction_time" id="reaction_time" />
+  <div class="mb-4">
+    <button type="button" id="play-btn" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">Play Morse</button>
+  </div>
+  {% if result is defined %}
+    <div class="mb-4">
+      {% if result.correct %}
+        <p class="text-green-600 text-lg">Correct!</p>
+      {% else %}
+        <p class="text-red-600 text-lg">Wrong! It was {{ result.target }}</p>
+      {% endif %}
+      <p class="mt-2">Reaction Time: {{ result.reaction_time | round(2) }}s</p>
+      <button type="button" id="next-btn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Next</button>
+    </div>
+  {% else %}
+    <div class="mb-4">
+      <label for="guess" class="block mb-1">What did you hear?</label>
+      <input type="text" name="guess" id="guess" maxlength="1" required class="border border-gray-400 rounded px-2 py-1 w-16 text-center uppercase text-xl" />
+    </div>
+    <button type="submit" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Submit</button>
+  {% endif %}
+</form>
+
+<script>
+// Morse code playback with Web Audio
+const WPM = {{ wpm }};
+const UNIT_S = 1.2 / WPM;
+const FREQ = {{ freq }};
+// map from template
+const MORSE_CODE = {{ morse_code | tojson }};
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(duration) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.frequency.value = FREQ;
+  osc.type = 'sine';
+  gain.gain.setValueAtTime(1, audioCtx.currentTime);
+  osc.start();
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+async function playMorse(text) {
+  for (const ch of text.toUpperCase()) {
+    const code = MORSE_CODE[ch];
+    if (!code) continue;
+    for (const sym of code) {
+      if (sym === '.') {
+        playTone(UNIT_S);
+        await sleep((UNIT_S + UNIT_S) * 1000);
+      } else {
+        playTone(UNIT_S * 3);
+        await sleep((UNIT_S * 3 + UNIT_S) * 1000);
+      }
+    }
+    await sleep(2 * UNIT_S * 1000);
+  }
+}
+
+document.getElementById('play-btn').addEventListener('click', async () => {
+  document.getElementById('play-btn').disabled = true;
+  await playMorse('{{ target }}');
+  document.getElementById('play-btn').disabled = false;
+  window.playbackEnd = performance.now();
+});
+
+const form = document.getElementById('listen-form');
+form.addEventListener('submit', (e) => {
+  const now = performance.now();
+  const rt = ((now - (window.playbackEnd||now)) / 1000).toFixed(3);
+  document.getElementById('reaction_time').value = rt;
+});
+
+{% if result is defined %}
+document.getElementById('next-btn').addEventListener('click', () => {
+  window.location = "{{ url_for('listen') }}";
+});
+{% endif %}
+</script>
+{% endblock %}

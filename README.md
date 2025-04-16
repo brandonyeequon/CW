@@ -11,7 +11,16 @@ Requirements:
 - pygame (install with `pip install pygame`)
 
 Usage:
-1. Install dependencies: `pip install pygame`
-2. Run the application: `python main.py`
+1. Install dependencies for desktop version:
+   - pygame (install with `pip install pygame`)
+2. Run the desktop application:
+   - `python main.py`
+
+Web Version (Flask + Tailwind):
+1. Install Flask:
+   - `pip install flask`
+2. Run the web application:
+   - `python app.py`
+3. Open your browser and go to `http://localhost:5000`
 
 Enjoy learning Morse code!

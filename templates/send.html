@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-2xl font-bold mb-4">Send Mode</h2>
+<p class="mb-4">Press and hold the button below to send a dot (short) or dash (long).</p>
+<div class="mb-4">
+  <button id="send-btn" class="px-6 py-4 bg-yellow-500 text-white rounded hover:bg-yellow-600">Hold to Send</button>
+</div>
+<div class="mb-4">
+  <p class="text-xl">Sequence: <span id="sequence" class="font-mono"></span></p>
+  <p class="text-2xl">Result: <span id="result">?</span></p>
+</div>
+<div class="space-x-4">
+  <button id="finish-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Finish</button>
+  <button id="reset-btn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Reset</button>
+</div>
+
+<script>
+const WPM = {{ wpm }};
+const UNIT_S = 1.2 / WPM;
+const FREQ = {{ freq }};
+const THRESHOLD_S = UNIT_S * 1.5;
+const MORSE_CODE = {{ morse_code | tojson }};
+const AVAILABLE = {{ available | tojson }};
+
+// Web Audio setup
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let osc, gainNode;
+
+function startTone() {
+  osc = audioCtx.createOscillator();
+  gainNode = audioCtx.createGain();
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  osc.frequency.value = FREQ;
+  osc.type = 'sine';
+  gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+  osc.start();
+}
+
+function stopTone() {
+  if (osc) {
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.02);
+    osc.stop(audioCtx.currentTime + 0.02);
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const sendBtn = document.getElementById('send-btn');
+  const seqSpan = document.getElementById('sequence');
+  const resultSpan = document.getElementById('result');
+  const finishBtn = document.getElementById('finish-btn');
+  const resetBtn = document.getElementById('reset-btn');
+  let seq = '';
+  let pressTime = 0;
+
+  sendBtn.addEventListener('mousedown', () => {
+    pressTime = performance.now();
+    startTone();
+  });
+  sendBtn.addEventListener('mouseup', () => {
+    const duration = (performance.now() - pressTime) / 1000;
+    stopTone();
+    seq += duration < THRESHOLD_S ? '.' : '-';
+    seqSpan.textContent = seq;
+    resultSpan.textContent = '?';
+  });
+
+  finishBtn.addEventListener('click', () => {
+    const rev = {};
+    Object.entries(MORSE_CODE).forEach(([k, v]) => rev[v] = k);
+    let letter = rev[seq] || '?';
+    if (!AVAILABLE.includes(letter)) letter = '?';
+    resultSpan.textContent = letter;
+  });
+
+  resetBtn.addEventListener('click', () => {
+    seq = '';
+    seqSpan.textContent = '';
+    resultSpan.textContent = '?';
+  });
+});
+</script>
+{% endblock %}
